@@ -1,20 +1,19 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
+import { authConfig } from "./auth.config";
 import { authorizeCredentials, type Credentials as Creds } from "./authorize";
 
 /**
- * NextAuth (Auth.js v5) configuration — Credentials provider, JWT sessions
- * (FR21/FR24/FR25). The credential check delegates to the pure
- * {@link authorizeCredentials} (unit-tested) with a Prisma-backed lookup.
+ * Full NextAuth config (Node runtime). Extends the edge-safe {@link authConfig}
+ * with the Credentials provider, whose authorize uses bcrypt + Prisma (both
+ * Node-only). Middleware imports `auth.config` instead, keeping the Edge bundle
+ * under the 1 MB limit.
  *
- * Server-only. Requires AUTH_SECRET + DATABASE_URL env vars (FR26/NFR10).
+ * Requires AUTH_SECRET + the Supabase DB env vars (FR26/NFR10).
  */
-const THIRTY_DAYS = 30 * 24 * 60 * 60;
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt", maxAge: THIRTY_DAYS, updateAge: 24 * 60 * 60 },
-  pages: { signIn: "/login" },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -31,24 +30,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    // Carry mustChange through the JWT + session so the UI can force a change.
-    jwt({ token, user }) {
-      if (user) {
-        token.mustChange =
-          (user as { mustChange?: boolean }).mustChange ?? false;
-        if (user.id) token.uid = user.id;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user) {
-        (session.user as { mustChange?: boolean }).mustChange = Boolean(
-          token.mustChange,
-        );
-        if (token.uid) session.user.id = token.uid as string;
-      }
-      return session;
-    },
-  },
 });
