@@ -778,3 +778,9 @@ body {
   color: var(--color-ink);
   cursor: pointer;
 }
+
+/* Full-bleed main for the /login route (no bottom nav). */
+.app-main--full {
+  min-height: 100dvh;
+  padding-bottom: 0;
+}

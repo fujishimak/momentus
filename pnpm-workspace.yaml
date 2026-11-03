@@ -5,6 +5,8 @@
 # Only esbuild needs its native binary here (for Vitest).
 onlyBuiltDependencies:
   - esbuild
+  - "@prisma/client"
+  - prisma
 
 # `ignoredBuiltDependencies` explicitly suppresses build scripts we do NOT want.
 # We run the on-device model via the WebAssembly runtime (onnxruntime-web), so the

@@ -15,19 +15,40 @@ const nextConfig: NextConfig = {
   // Pin the workspace root to this project (a stray lockfile in $HOME would
   // otherwise confuse Next's root inference).
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
-  // Static export so the same build can be wrapped by Capacitor (iOS webview).
-  output: "export",
-  // Static export cannot run the Next.js image optimizer.
-  images: {
-    unoptimized: true,
-  },
-  // Relative asset paths keep the bundle portable to a file:// / webview context.
-  // (Vercel serves from root; Capacitor serves from a local origin.)
-  trailingSlash: true,
+  // Hosted Next.js server app (Amendment 2 / design §12): NextAuth + API routes
+  // require a server, so static export is NOT used. Deployed to Vercel.
   reactStrictMode: true,
-  // NOTE: security headers (X-Content-Type-Options, X-Frame-Options,
-  // Referrer-Policy, SW Cache-Control/CSP) are configured at the host/proxy
-  // (vercel.json) because `output: 'export'` cannot emit headers here.
+  // Security headers now emitted here (a server app can set headers; this
+  // replaces the static-export-era vercel.json headers). SW gets no-cache + CSP.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; script-src 'self'",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);

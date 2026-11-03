@@ -3,7 +3,6 @@ import {
   type NewEntry,
   type ChatMessage,
   type NewChatMessage,
-  type AuthRecord,
   type MomentusStore,
 } from "./types";
 import { dayKeyOf } from "@/lib/limits";
@@ -12,7 +11,6 @@ const DB_VERSION = 2;
 const STORE_ENTRIES = "entries";
 const STORE_VECTORS = "vectors";
 const STORE_CHAT = "chat";
-const STORE_AUTH = "auth";
 
 /** Serialized blob form: raw bytes + MIME type. ArrayBuffers survive IndexedDB
  * structured clone reliably across engines (and map cleanly to SQLite BLOBs on
@@ -93,9 +91,6 @@ export class IndexedDbStore implements MomentusStore {
           if (!db.objectStoreNames.contains(STORE_CHAT)) {
             const chat = db.createObjectStore(STORE_CHAT, { keyPath: "id" });
             chat.createIndex("createdAt", "createdAt");
-          }
-          if (!db.objectStoreNames.contains(STORE_AUTH)) {
-            db.createObjectStore(STORE_AUTH, { keyPath: "username" });
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -225,19 +220,5 @@ export class IndexedDbStore implements MomentusStore {
   async clearChat(): Promise<void> {
     const store = await this.tx(STORE_CHAT, "readwrite");
     await promisifyRequest(store.clear());
-  }
-
-  // --- Auth ---
-
-  async getAuth(username: string): Promise<AuthRecord | undefined> {
-    const store = await this.tx(STORE_AUTH, "readonly");
-    return (await promisifyRequest(store.get(username))) as
-      | AuthRecord
-      | undefined;
-  }
-
-  async putAuth(record: AuthRecord): Promise<void> {
-    const store = await this.tx(STORE_AUTH, "readwrite");
-    await promisifyRequest(store.put(record));
   }
 }

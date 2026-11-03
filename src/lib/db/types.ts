@@ -39,16 +39,6 @@ export type NewEntry = Omit<Entry, "id" | "createdAt" | "dayKey"> & {
 
 export type ChatRole = "user" | "assistant";
 
-/** The stored authentication credential (FR17-FR19). Single row keyed by
- * username. Only a salted hash is persisted — never the plaintext. */
-export interface AuthRecord {
-  username: string;
-  salt: string;
-  passwordHash: string;
-  /** True until the forced first-login password change is completed (FR19). */
-  mustChange: boolean;
-}
-
 /** One message in the single persistent chat thread (design §3.4). */
 export interface ChatMessage {
   id: string;
@@ -85,8 +75,4 @@ export interface MomentusStore {
   appendChatMessage(message: NewChatMessage): Promise<ChatMessage>;
   listChatMessages(): Promise<ChatMessage[]>;
   clearChat(): Promise<void>;
-
-  // --- Auth (FR16-FR20) ---
-  getAuth(username: string): Promise<AuthRecord | undefined>;
-  putAuth(record: AuthRecord): Promise<void>;
 }

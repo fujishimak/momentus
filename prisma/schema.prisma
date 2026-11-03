@@ -1,0 +1,25 @@
+// Momentus — Prisma schema (Milestone 1: auth/server foundation).
+//
+// Source of truth for users (and, in M2, entries). Binaries NEVER live in the
+// DB — M2's Entry stores Vercel Blob pointers (url/type/size) only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// The single seeded account (FR23). NextAuth Credentials verifies against
+/// passwordHash; `mustChange` forces a password change on first login (FR23).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  mustChange   Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  // entries   Entry[]  // added in M2
+}
