@@ -2,21 +2,24 @@
 
 import { useState } from "react";
 import { MAX_WORDS, countWords, clampToWordLimit } from "@/lib/limits";
+import { PhotoThumb } from "./PhotoThumb";
+import { AddPhotoButton } from "./AddPhotoButton";
 
 export interface TextSheetProps {
-  /** Persist the entry text. May reject; the message is shown to the user. */
-  onSave: (text: string) => Promise<void> | void;
+  /** Persist the entry. May reject; the message is shown to the user. */
+  onSave: (text: string, photo?: Blob) => Promise<void> | void;
   /** Dismiss the sheet (returns to audio capture). */
   onClose: () => void;
 }
 
 /**
  * "Share Your Thoughts" sheet (design §3.2). A word-counted textarea hard-capped
- * at 150 words (FR3) with a Save button. Pure UI — persistence and limit
- * enforcement are injected via onSave (see lib/capture/save-entry).
+ * at 150 words (FR3) with an optional photo (FR5) and a Save button. Pure UI —
+ * persistence and limit enforcement are injected via onSave.
  */
 export function TextSheet({ onSave, onClose }: TextSheetProps) {
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<Blob | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,8 +36,9 @@ export function TextSheet({ onSave, onClose }: TextSheetProps) {
     setSaving(true);
     setError(null);
     try {
-      await onSave(text.trim());
+      await onSave(text.trim(), photo ?? undefined);
       setText("");
+      setPhoto(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save your entry.");
     } finally {
@@ -55,6 +59,8 @@ export function TextSheet({ onSave, onClose }: TextSheetProps) {
           ✕
         </button>
       </div>
+
+      {photo && <PhotoThumb photo={photo} onRemove={() => setPhoto(null)} />}
 
       <div className="text-sheet__field">
         <textarea
@@ -81,14 +87,19 @@ export function TextSheet({ onSave, onClose }: TextSheetProps) {
         </p>
       )}
 
-      <button
-        type="button"
-        className="text-sheet__save"
-        onClick={handleSave}
-        disabled={!canSave}
-      >
-        {saving ? "Saving…" : "Save"}
-      </button>
+      <div className="text-sheet__actions">
+        {!photo && (
+          <AddPhotoButton variant="icon" onPhoto={(p) => setPhoto(p)} />
+        )}
+        <button
+          type="button"
+          className="text-sheet__save"
+          onClick={handleSave}
+          disabled={!canSave}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }

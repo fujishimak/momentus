@@ -3,12 +3,14 @@
 import { useRef, useState } from "react";
 import { AudioRecorder } from "@/lib/capture/audio";
 import { MAX_AUDIO_SECONDS } from "@/lib/limits";
+import { PhotoThumb } from "./PhotoThumb";
+import { AddPhotoButton } from "./AddPhotoButton";
 
 type RecState = "idle" | "recording" | "complete";
 
 export interface MicRecorderProps {
-  /** Persist the recorded audio. May reject; message is surfaced. */
-  onSave: (audio: Blob) => Promise<void> | void;
+  /** Persist the recorded audio (with optional photo). May reject; surfaced. */
+  onSave: (audio: Blob, photo?: Blob) => Promise<void> | void;
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -31,6 +33,7 @@ export function MicRecorder({ onSave }: MicRecorderProps) {
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const [recorded, setRecorded] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   function stopTick() {
@@ -70,6 +73,7 @@ export function MicRecorder({ onSave }: MicRecorderProps) {
 
   function handleDiscard() {
     setRecorded(null);
+    setPhoto(null);
     setElapsed(0);
     setError(null);
     setState("idle");
@@ -80,8 +84,9 @@ export function MicRecorder({ onSave }: MicRecorderProps) {
     setSaving(true);
     setError(null);
     try {
-      await onSave(recorded);
+      await onSave(recorded, photo ?? undefined);
       setRecorded(null);
+      setPhoto(null);
       setElapsed(0);
       setState("idle");
     } catch (e) {
@@ -99,6 +104,7 @@ export function MicRecorder({ onSave }: MicRecorderProps) {
         </div>
         <p className="mic-complete__status">Recording complete!</p>
         <p className="mic-complete__duration">{formatDuration(elapsed)}</p>
+        {photo && <PhotoThumb photo={photo} onRemove={() => setPhoto(null)} />}
         {error && (
           <p className="mic-complete__error" role="alert">
             {error}
@@ -121,6 +127,7 @@ export function MicRecorder({ onSave }: MicRecorderProps) {
             <span aria-hidden="true">💾</span>{" "}
             <span>{saving ? "Saving…" : "Save"}</span>
           </button>
+          {!photo && <AddPhotoButton onPhoto={(p) => setPhoto(p)} />}
         </div>
       </div>
     );

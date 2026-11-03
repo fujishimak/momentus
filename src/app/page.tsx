@@ -5,19 +5,32 @@ import { TextSheet } from "@/components/TextSheet";
 import { MicRecorder } from "@/components/MicRecorder";
 import { getStore } from "@/lib/db";
 import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
+import { getCurrentLocation } from "@/lib/capture/location";
 
 type Mode = "audio" | "text";
 
 export default function CapturePage() {
   const [mode, setMode] = useState<Mode>("audio");
 
-  async function handleSaveText(text: string) {
-    await saveTextEntry(getStore(), { text });
+  async function handleSaveText(text: string, photo?: Blob) {
+    const loc = await getCurrentLocation();
+    await saveTextEntry(getStore(), {
+      text,
+      photo,
+      lat: loc?.lat,
+      lng: loc?.lng,
+    });
     setMode("audio");
   }
 
-  async function handleSaveAudio(audio: Blob) {
-    await saveAudioEntry(getStore(), { audio });
+  async function handleSaveAudio(audio: Blob, photo?: Blob) {
+    const loc = await getCurrentLocation();
+    await saveAudioEntry(getStore(), {
+      audio,
+      photo,
+      lat: loc?.lat,
+      lng: loc?.lng,
+    });
   }
 
   return (

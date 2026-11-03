@@ -367,3 +367,64 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* --- Photo thumbnail (design §3.1a / §3.2, FR5) --- */
+.photo-thumb {
+  position: relative;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.photo-thumb__img {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+}
+
+.photo-thumb__remove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 6px rgba(30, 27, 75, 0.25);
+}
+
+/* --- Add Photo controls --- */
+.add-photo--icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  background: var(--color-card);
+  box-shadow: 0 4px 12px rgba(30, 27, 75, 0.12);
+  font-size: 20px;
+}
+
+.add-photo__error {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  margin: 0.5rem 0 0;
+}
+
+.text-sheet__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.text-sheet__actions .text-sheet__save {
+  flex: 1;
+  margin-top: 0;
+}

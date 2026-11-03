@@ -37,13 +37,13 @@ describe("TextSheet (design §3.2)", () => {
     expect(screen.getByText("150 / 150")).toBeInTheDocument();
   });
 
-  it("calls onSave with the typed text", async () => {
+  it("calls onSave with the typed text (and no photo)", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<TextSheet onSave={onSave} onClose={vi.fn()} />);
     await user.type(screen.getByRole("textbox"), "a good day");
     await user.click(screen.getByRole("button", { name: /save/i }));
-    expect(onSave).toHaveBeenCalledWith("a good day");
+    expect(onSave).toHaveBeenCalledWith("a good day", undefined);
   });
 
   it("surfaces a save error message", async () => {
@@ -55,5 +55,12 @@ describe("TextSheet (design §3.2)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /daily limit reached/i,
     );
+  });
+
+  it("shows an Add Photo control (FR5) when no photo is attached", () => {
+    render(<TextSheet onSave={vi.fn()} onClose={vi.fn()} />);
+    expect(
+      screen.getByRole("button", { name: /add photo/i }),
+    ).toBeInTheDocument();
   });
 });
