@@ -1,27 +1,23 @@
-import { auth } from "@/lib/auth/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth/auth.config";
 
 /**
- * Route protection (FR21): unauthenticated requests to app routes are
- * redirected to /login. /login and /api/auth/* are always allowed. Static
- * assets, the service worker, manifest, and icons are excluded via the matcher.
+ * Route protection at the Edge (FR21). Uses the edge-safe `authConfig` only
+ * (no bcrypt/Prisma), so the middleware bundle stays under Vercel's 1 MB Edge
+ * limit. The `authorized` callback in authConfig decides access; NextAuth
+ * redirects unauthenticated requests to the configured signIn page (/login).
  */
-export default auth((req) => {
-  const { nextUrl } = req;
-  const isLoggedIn = Boolean(req.auth);
-  const isLogin = nextUrl.pathname === "/login";
+export const { auth: middleware } = NextAuth(authConfig);
 
-  if (!isLoggedIn && !isLogin) {
-    const url = new URL("/login", nextUrl.origin);
-    return Response.redirect(url);
-  }
-  // Signed-in users hitting /login go to the app.
-  if (isLoggedIn && isLogin) {
-    return Response.redirect(new URL("/", nextUrl.origin));
+export default middleware((req) => {
+  // Signed-in users hitting /login are sent to the app; everything else is
+  // handled by the `authorized` callback (redirect to /login when needed).
+  if (req.auth && req.nextUrl.pathname === "/login") {
+    return Response.redirect(new URL("/", req.nextUrl.origin));
   }
 });
 
 export const config = {
-  // Run on everything except Next internals, the SW, manifest, and static files.
   matcher: [
     "/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons).*)",
   ],
