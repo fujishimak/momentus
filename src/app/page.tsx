@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { TextSheet } from "@/components/TextSheet";
+import { MicRecorder } from "@/components/MicRecorder";
 import { getStore } from "@/lib/db";
-import { saveTextEntry } from "@/lib/capture/save-entry";
+import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
 
 type Mode = "audio" | "text";
 
@@ -15,6 +16,10 @@ export default function CapturePage() {
     setMode("audio");
   }
 
+  async function handleSaveAudio(audio: Blob) {
+    await saveAudioEntry(getStore(), { audio });
+  }
+
   return (
     <section className="capture" aria-labelledby="capture-heading">
       <h1 id="capture-heading" className="capture__heading">
@@ -23,17 +28,7 @@ export default function CapturePage() {
 
       {mode === "audio" ? (
         <>
-          <div className="capture__focal">
-            <button
-              type="button"
-              className="mic-button"
-              aria-label="Start recording"
-            >
-              <span className="mic-button__glyph" aria-hidden="true">
-                🎤
-              </span>
-            </button>
-          </div>
+          <MicRecorder onSave={handleSaveAudio} />
 
           <button
             type="button"
