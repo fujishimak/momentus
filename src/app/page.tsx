@@ -7,7 +7,7 @@ import { getStore } from "@/lib/db";
 import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
 import { getCurrentLocation } from "@/lib/capture/location";
 import { getEmbedder } from "@/lib/ai/embeddings";
-import { signOut } from "@/components/AuthGate";
+import { signOut } from "next-auth/react";
 
 type Mode = "audio" | "text";
 
@@ -42,7 +42,7 @@ export default function CapturePage() {
         type="button"
         className="capture__signout"
         aria-label="Sign out"
-        onClick={() => signOut()}
+        onClick={() => signOut({ callbackUrl: "/login" })}
       >
         Sign out
       </button>

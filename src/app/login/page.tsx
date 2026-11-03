@@ -1,56 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { getStore } from "@/lib/db";
-import { authenticate, changePassword } from "@/lib/auth/session";
+import { Suspense, useState } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { changeOwnPassword } from "./actions";
 
-export interface LoginFormProps {
-  /** Called once the user is fully signed in (and any forced change done). */
-  onSignedIn: () => void;
-}
+const MIN = 8;
 
-type Stage = "login" | "change";
-
-const MIN_PASSWORD = 8;
-
-/**
- * Login screen (design §3.7, FR16-FR19). Email + password, no signup. On first
- * login with the initial password, switches to a forced "set a new password"
- * stage before completing sign-in.
- */
-export function LoginForm({ onSignedIn }: LoginFormProps) {
-  const [stage, setStage] = useState<Stage>("login");
+function LoginInner() {
+  const router = useRouter();
+  const [stage, setStage] = useState<"login" | "change">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [offline, setOffline] = useState(
+    typeof navigator !== "undefined" && !navigator.onLine,
+  );
 
-  async function handleLogin() {
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
     if (busy) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setOffline(true);
+      setError("You're offline — connect to sign in.");
+      return;
+    }
     setBusy(true);
     setError(null);
-    try {
-      const result = await authenticate(getStore(), email.trim(), password);
-      if (!result.ok) {
-        setError("Incorrect email or password.");
-        return;
-      }
-      if (result.mustChange) {
-        setStage("change");
-        return;
-      }
-      onSignedIn();
-    } finally {
-      setBusy(false);
+    // Don't auto-redirect; we may need the forced-change step first.
+    const res = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+    setBusy(false);
+    if (!res || res.error) {
+      setError("Incorrect email or password.");
+      return;
     }
+    // Check whether a forced change is required (session carries mustChange).
+    const session = await fetch("/api/auth/session").then((r) => r.json());
+    if (session?.user?.mustChange) {
+      setStage("change");
+      return;
+    }
+    router.replace("/");
   }
 
-  async function handleChange() {
+  async function handleChange(e: React.FormEvent) {
+    e.preventDefault();
     if (busy) return;
-    if (newPassword.length < MIN_PASSWORD) {
-      setError(`New password must be at least ${MIN_PASSWORD} characters.`);
+    if (newPassword.length < MIN) {
+      setError(`New password must be at least ${MIN} characters.`);
       return;
     }
     if (newPassword !== confirm) {
@@ -59,12 +63,25 @@ export function LoginForm({ onSignedIn }: LoginFormProps) {
     }
     setBusy(true);
     setError(null);
-    try {
-      await changePassword(getStore(), email.trim(), newPassword);
-      onSignedIn();
-    } finally {
-      setBusy(false);
+    const result = await changeOwnPassword(newPassword);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error ?? "Could not change your password.");
+      return;
     }
+    // Re-authenticate with the new password to refresh the JWT (clears mustChange).
+    const res = await signIn("credentials", {
+      email,
+      password: newPassword,
+      redirect: false,
+    });
+    if (!res || res.error) {
+      setStage("login");
+      setPassword("");
+      setError("Password changed — please sign in with your new password.");
+      return;
+    }
+    router.replace("/");
   }
 
   return (
@@ -75,12 +92,7 @@ export function LoginForm({ onSignedIn }: LoginFormProps) {
         </h1>
 
         {stage === "login" ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleLogin();
-            }}
-          >
+          <form onSubmit={handleLogin}>
             <label className="login__label" htmlFor="login-email">
               Email
             </label>
@@ -109,16 +121,11 @@ export function LoginForm({ onSignedIn }: LoginFormProps) {
               </p>
             )}
             <button type="submit" className="login__submit" disabled={busy}>
-              {busy ? "Signing in…" : "Sign In"}
+              {busy ? "Signing in…" : offline ? "Offline" : "Sign In"}
             </button>
           </form>
         ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleChange();
-            }}
-          >
+          <form onSubmit={handleChange}>
             <p className="login__hint">
               Set a new password to finish signing in.
             </p>
@@ -156,5 +163,13 @@ export function LoginForm({ onSignedIn }: LoginFormProps) {
         )}
       </div>
     </section>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<p className="screen__placeholder">Loading…</p>}>
+      <LoginInner />
+    </Suspense>
   );
 }
