@@ -7,6 +7,7 @@ import { getStore } from "@/lib/db";
 import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
 import { getCurrentLocation } from "@/lib/capture/location";
 import { getEmbedder } from "@/lib/ai/embeddings";
+import { signOut } from "@/components/AuthGate";
 
 type Mode = "audio" | "text";
 
@@ -37,6 +38,14 @@ export default function CapturePage() {
 
   return (
     <section className="capture" aria-labelledby="capture-heading">
+      <button
+        type="button"
+        className="capture__signout"
+        aria-label="Sign out"
+        onClick={() => signOut()}
+      >
+        Sign out
+      </button>
       <h1 id="capture-heading" className="capture__heading">
         What&rsquo;s On Your Mind?
       </h1>
