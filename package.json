@@ -36,6 +36,7 @@
   },
   "packageManager": "pnpm@12.16.1",
   "dependencies": {
+    "@huggingface/transformers": "3.8.1",
     "next": "15.5.4",
     "react": "19.1.1",
     "react-dom": "19.1.1"

@@ -5,6 +5,8 @@ import {
   dayKeyOf,
   isWithinWordLimit,
 } from "@/lib/limits";
+import type { Embedder } from "@/lib/ai/embeddings";
+import { embedAndStore } from "@/lib/ai/search";
 
 /** Thrown when saving would exceed the 5-entries-per-day cap (FR6). */
 export class DailyLimitError extends Error {
@@ -54,6 +56,8 @@ export interface SaveTextEntryInput {
   photo?: Blob;
   lat?: number;
   lng?: number;
+  /** Optional embedder: when provided, the entry is embedded for search. */
+  embedder?: Embedder;
   /** Timestamp override for deterministic testing. Defaults to now. */
   now?: number;
 }
@@ -64,7 +68,8 @@ export interface SaveTextEntryInput {
  * The daily-cap check and the insert are performed as a count-then-insert
  * guard so the 6th same-day entry is rejected (FR6). For the single local user
  * this is effectively atomic; the native backend will wrap it in one
- * transaction (task T2.5).
+ * transaction (task T2.5). When an embedder is supplied, the entry text is
+ * embedded for semantic search (FR12) — best-effort, never blocks the save.
  */
 export async function saveTextEntry(
   store: MomentusStore,
@@ -79,7 +84,7 @@ export async function saveTextEntry(
 
   await assertDailyCapAvailable(store, dayKey);
 
-  return store.createEntry({
+  const entry = await store.createEntry({
     modality: "text",
     textContent: text,
     transcriptPending: false,
@@ -89,6 +94,12 @@ export async function saveTextEntry(
     createdAt: now,
     dayKey,
   });
+
+  if (input.embedder) {
+    await embedAndStore(store, input.embedder, entry.id, text);
+  }
+
+  return entry;
 }
 
 export interface SaveAudioEntryInput {
