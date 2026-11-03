@@ -6,6 +6,7 @@ import { MicRecorder } from "@/components/MicRecorder";
 import { getStore } from "@/lib/db";
 import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
 import { getCurrentLocation } from "@/lib/capture/location";
+import { getEmbedder } from "@/lib/ai/embeddings";
 
 type Mode = "audio" | "text";
 
@@ -19,6 +20,7 @@ export default function CapturePage() {
       photo,
       lat: loc?.lat,
       lng: loc?.lng,
+      embedder: getEmbedder(),
     });
     setMode("audio");
   }

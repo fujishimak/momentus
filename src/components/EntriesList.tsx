@@ -7,6 +7,8 @@ import {
   type ModalityFilter,
   type RangeFilter,
 } from "@/lib/entries/view";
+import { getEmbedder } from "@/lib/ai/embeddings";
+import { semanticSearch } from "@/lib/ai/search";
 import { EntryCard } from "./EntryCard";
 
 const MODALITY_CHIPS: { value: ModalityFilter; label: string }[] = [
@@ -28,6 +30,7 @@ const RANGE_OPTIONS: { value: RangeFilter; label: string }[] = [
  */
 export function EntriesList() {
   const [entries, setEntries] = useState<Entry[] | null>(null);
+  const [searchResults, setSearchResults] = useState<Entry[] | null>(null);
   const [query, setQuery] = useState("");
   const [modality, setModality] = useState<ModalityFilter>("all");
   const [range, setRange] = useState<RangeFilter>("all");
@@ -44,10 +47,32 @@ export function EntriesList() {
     };
   }, []);
 
+  // Semantic search (FR12) on query change, debounced. Falls back to substring
+  // internally (R1) when embeddings are unavailable. Empty query → show all.
+  useEffect(() => {
+    const q = query.trim();
+    if (q === "") {
+      setSearchResults(null);
+      return;
+    }
+    let active = true;
+    const handle = setTimeout(() => {
+      semanticSearch(getStore(), getEmbedder(), q).then((results) => {
+        if (active) setSearchResults(results);
+      });
+    }, 200);
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
+  }, [query]);
+
   const visible = useMemo(() => {
-    if (!entries) return [];
-    return filterEntries(entries, { modality, query, range });
-  }, [entries, modality, query, range]);
+    // When a query is active, rank order comes from semantic search; otherwise
+    // use the full list. Modality + date range always apply on top.
+    const base = query.trim() !== "" ? (searchResults ?? []) : (entries ?? []);
+    return filterEntries(base, { modality, query: "", range });
+  }, [entries, searchResults, query, modality, range]);
 
   return (
     <section className="screen" aria-labelledby="entries-heading">

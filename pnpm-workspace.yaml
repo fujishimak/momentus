@@ -1,7 +1,22 @@
-allowBuilds:
-  esbuild: true
-  sharp: true
-# pnpm settings. `onlyBuiltDependencies` whitelists packages allowed to run
-# install/build scripts (pnpm blocks these by default as a supply-chain guard).
-# esbuild needs its native binary for Vitest; sharp is intentionally NOT listed
-# because the static export uses unoptimized images.
+# pnpm settings.
+#
+# `onlyBuiltDependencies` allow-lists packages permitted to run install/build
+# scripts (pnpm blocks all build scripts by default as a supply-chain guard).
+# Only esbuild needs its native binary here (for Vitest).
+onlyBuiltDependencies:
+  - esbuild
+
+# `ignoredBuiltDependencies` explicitly suppresses build scripts we do NOT want.
+# We run the on-device model via the WebAssembly runtime (onnxruntime-web), so the
+# native onnxruntime-node build is intentionally skipped; protobufjs' and sharp's
+# postinstall builds are not needed (static export uses unoptimized images).
+ignoredBuiltDependencies:
+  - onnxruntime-node
+  - protobufjs
+  - sharp
+
+# Do not fail the install merely because some dependency build scripts are not in
+# the allow-list. The allow/ignore lists above are the policy; without this,
+# pnpm@12 exits non-zero on a clean (CI) install that has no local approval state,
+# breaking `pnpm install --frozen-lockfile` before any gate runs.
+strictDepBuilds: false
