@@ -784,3 +784,33 @@ body {
   min-height: 100dvh;
   padding-bottom: 0;
 }
+
+/* --- Sync status indicator (FR31) + capture topbar --- */
+.capture__topbar {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  right: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.sync-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: rgba(30, 27, 75, 0.7);
+}
+
+.sync-status[data-status="syncing"] {
+  color: var(--color-accent-strong);
+}
+.sync-status[data-status="offline"] {
+  color: #92400e;
+}
+.sync-status[data-status="error"] {
+  color: #b91c1c;
+}

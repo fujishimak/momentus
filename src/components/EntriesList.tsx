@@ -9,6 +9,7 @@ import {
 } from "@/lib/entries/view";
 import { getEmbedder } from "@/lib/ai/embeddings";
 import { semanticSearch } from "@/lib/ai/search";
+import { getSyncController } from "@/lib/sync/controller";
 import { EntryCard } from "./EntryCard";
 
 const MODALITY_CHIPS: { value: ModalityFilter; label: string }[] = [
@@ -37,10 +38,16 @@ export function EntriesList() {
 
   useEffect(() => {
     let active = true;
-    getStore()
-      .listEntries()
-      .then((list) => {
-        if (active) setEntries(list);
+    // Pull remote changes first so this device sees entries from others,
+    // then load the local (now-merged) list (FR29).
+    getSyncController()
+      .sync()
+      .finally(() => {
+        getStore()
+          .listEntries()
+          .then((list) => {
+            if (active) setEntries(list);
+          });
       });
     return () => {
       active = false;
