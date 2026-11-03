@@ -1,0 +1,13 @@
+# gitleaks configuration for Momentus.
+# Extends the built-in default rule set (covers common cloud keys, tokens, etc.).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for known-safe paths and example files."
+paths = [
+  '''\.env\.example$''',
+  '''pnpm-lock\.yaml$''',
+  '''\.husky/''',
+  '''\.gitleaks\.toml$''',
+]

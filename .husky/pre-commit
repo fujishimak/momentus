@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+
+# 1) Lint + format staged files.
+pnpm exec lint-staged || exit 1
+
+# 2) Secret scan over the staged diff (gitleaks).
+#    Fails the commit if a secret is detected. If gitleaks is not installed,
+#    warn loudly but do not block — CI runs gitleaks as a hard gate.
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "🔍 gitleaks: scanning staged changes for secrets..."
+  gitleaks protect --staged --redact --config .gitleaks.toml || {
+    echo "❌ gitleaks detected a potential secret in your staged changes. Commit aborted."
+    exit 1
+  }
+else
+  echo "⚠️  gitleaks not found — skipping local secret scan."
+  echo "    Install it (https://github.com/gitleaks/gitleaks) for pre-commit secret detection."
+  echo "    CI will still run gitleaks as a required gate."
+fi
