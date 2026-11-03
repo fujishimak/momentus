@@ -54,6 +54,7 @@
     "eslint": "9.37.0",
     "eslint-config-next": "15.5.4",
     "eslint-config-prettier": "9.1.2",
+    "fake-indexeddb": "6.0.1",
     "husky": "9.1.7",
     "jsdom": "25.0.1",
     "lint-staged": "15.5.2",
