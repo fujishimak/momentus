@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+coverage
+public/sw.js
+pnpm-lock.yaml
+ios
+android
+.kiro

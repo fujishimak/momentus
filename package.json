@@ -1,0 +1,74 @@
+{
+  "name": "momentus",
+  "version": "1.0.0",
+  "description": "Local-first daily micro-journal PWA for speakers and improvisers.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "dev:https": "next dev --experimental-https",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
+    "lint": "next lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "pwa",
+    "journal",
+    "nextjs",
+    "capacitor",
+    "offline-first"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.16.1",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.16.1",
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "3.3.1",
+    "@serwist/next": "9.2.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.0",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "22.18.8",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "@vitejs/plugin-react": "4.7.0",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.37.0",
+    "eslint-config-next": "15.5.4",
+    "eslint-config-prettier": "9.1.2",
+    "husky": "9.1.7",
+    "jsdom": "25.0.1",
+    "lint-staged": "15.5.2",
+    "prettier": "3.6.2",
+    "serwist": "9.2.1",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}

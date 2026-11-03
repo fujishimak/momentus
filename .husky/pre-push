@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+# Mirror the CI gate before code reaches the remote: types + tests must pass.
+echo "🧪 pre-push: typecheck + tests (mirrors CI)..."
+pnpm typecheck || { echo "❌ typecheck failed — push aborted."; exit 1; }
+pnpm test || { echo "❌ tests failed — push aborted."; exit 1; }
