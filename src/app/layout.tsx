@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { BottomNav } from "@/components/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { AuthGate } from "@/components/AuthGate";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,10 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div className="app-shell">
-          <main className="app-main">{children}</main>
-          <BottomNav />
-        </div>
+        <AuthGate>
+          <div className="app-shell">
+            <main className="app-main">{children}</main>
+            <BottomNav />
+          </div>
+        </AuthGate>
         <ServiceWorkerRegistrar />
       </body>
     </html>

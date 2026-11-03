@@ -689,3 +689,92 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* --- Login screen (design §3.7) --- */
+.login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: linear-gradient(160deg, #c7d2fe 0%, #eef2ff 60%, #e0e7ff 100%);
+}
+
+.login__card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-card);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 12px 32px rgba(30, 27, 75, 0.15);
+}
+
+.login__title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  text-align: center;
+  margin: 0 0 1.25rem;
+  color: var(--color-ink);
+}
+
+.login__hint {
+  font-size: 0.9rem;
+  color: rgba(30, 27, 75, 0.7);
+  margin: 0 0 1rem;
+}
+
+.login__label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(30, 27, 75, 0.7);
+  margin: 0.75rem 0 0.3rem;
+}
+
+.login__input {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  border-radius: 10px;
+  font: inherit;
+  background: white;
+}
+
+.login__error {
+  color: #b91c1c;
+  font-size: 0.85rem;
+  margin: 0.75rem 0 0;
+}
+
+.login__submit {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.85rem;
+  border: none;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --- Sign out (Capture header) --- */
+.capture__signout {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  border: none;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 9999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--color-ink);
+  cursor: pointer;
+}
