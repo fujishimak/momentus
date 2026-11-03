@@ -209,3 +209,82 @@ describe("IndexedDbStore — chat thread (design §3.4)", () => {
     expect(await store.listChatMessages()).toHaveLength(0);
   });
 });
+
+describe("IndexedDbStore — sync fields (M2, FR27-FR31)", () => {
+  let store: MomentusStore;
+  beforeEach(() => {
+    store = freshStore();
+  });
+
+  it("defaults sync fields on create (updatedAt=createdAt, not deleted, local)", async () => {
+    const e = await store.createEntry({
+      modality: "text",
+      textContent: "hello",
+      transcriptPending: false,
+      createdAt: 5000,
+    });
+    expect(e.updatedAt).toBe(5000);
+    expect(e.deleted).toBe(false);
+    expect(e.syncState).toBe("local");
+  });
+
+  it("updateEntry patches fields and bumps updatedAt", async () => {
+    const e = await store.createEntry({
+      modality: "audio",
+      textContent: "",
+      transcriptPending: true,
+      createdAt: 1000,
+    });
+    const updated = await store.updateEntry(e.id, {
+      textContent: "a transcript",
+      transcriptPending: false,
+      updatedAt: 2000,
+    });
+    expect(updated?.textContent).toBe("a transcript");
+    expect(updated?.transcriptPending).toBe(false);
+    expect(updated?.updatedAt).toBe(2000);
+    const back = await store.getEntry(e.id);
+    expect(back?.textContent).toBe("a transcript");
+  });
+
+  it("softDeleteEntry tombstones (hidden from listEntries, present for sync)", async () => {
+    const e = await store.createEntry({
+      modality: "text",
+      textContent: "to delete",
+      transcriptPending: false,
+    });
+    await store.softDeleteEntry(e.id);
+
+    const visible = await store.listEntries();
+    expect(visible.find((x) => x.id === e.id)).toBeUndefined();
+
+    const forSync = await store.listEntriesForSync();
+    const tomb = forSync.find((x) => x.id === e.id);
+    expect(tomb?.deleted).toBe(true);
+  });
+
+  it("excludes tombstones from the daily count (FR6/FR32)", async () => {
+    const day = new Date(2026, 10, 3, 12).getTime();
+    const a = await store.createEntry({
+      modality: "text",
+      textContent: "a",
+      transcriptPending: false,
+      createdAt: day,
+    });
+    await store.createEntry({
+      modality: "text",
+      textContent: "b",
+      transcriptPending: false,
+      createdAt: day + 1,
+    });
+    expect(await store.countEntriesForDay(a.dayKey)).toBe(2);
+    await store.softDeleteEntry(a.id);
+    expect(await store.countEntriesForDay(a.dayKey)).toBe(1);
+  });
+
+  it("updateEntry returns undefined for a missing id", async () => {
+    expect(
+      await store.updateEntry("nope", { textContent: "x" }),
+    ).toBeUndefined();
+  });
+});

@@ -60,7 +60,7 @@ export function EntryDetail({ entryId, onDeleted }: EntryDetailProps) {
 
   async function handleDelete() {
     setDeleting(true);
-    await getStore().deleteEntry(entryId);
+    await getStore().softDeleteEntry(entryId);
     onDeleted();
   }
 

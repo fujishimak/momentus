@@ -123,6 +123,12 @@ export class IndexedDbStore implements MomentusStore {
       lat: input.lat,
       lng: input.lng,
       dayKey: input.dayKey ?? dayKeyOf(createdAt),
+      // Sync defaults (M2): modified = created; not deleted; queued locally.
+      updatedAt: input.updatedAt ?? createdAt,
+      deleted: input.deleted ?? false,
+      audioUrl: input.audioUrl,
+      photoUrl: input.photoUrl,
+      syncState: input.syncState ?? "local",
     };
     const stored: StoredEntry = {
       ...entry,
@@ -155,8 +161,45 @@ export class IndexedDbStore implements MomentusStore {
     const store = await this.tx(STORE_ENTRIES, "readonly");
     const all = (await promisifyRequest(store.getAll())) as StoredEntry[];
     return all
+      .filter((s) => !s.deleted) // hide tombstones from the UI (FR11/FR30)
       .sort((a, b) => b.createdAt - a.createdAt)
       .map((s) => this.hydrate(s)!);
+  }
+
+  async listEntriesForSync(): Promise<Entry[]> {
+    const store = await this.tx(STORE_ENTRIES, "readonly");
+    const all = (await promisifyRequest(store.getAll())) as StoredEntry[];
+    return all.map((s) => this.hydrate(s)!);
+  }
+
+  async updateEntry(
+    id: string,
+    patch: Partial<Entry>,
+  ): Promise<Entry | undefined> {
+    const current = await this.getEntry(id);
+    if (!current) return undefined;
+    const merged: Entry = {
+      ...current,
+      ...patch,
+      id: current.id,
+      updatedAt: patch.updatedAt ?? Date.now(),
+    };
+    const stored: StoredEntry = {
+      ...merged,
+      audioBlob: await toStoredBlob(merged.audioBlob),
+      photoBlob: await toStoredBlob(merged.photoBlob),
+    };
+    const store = await this.tx(STORE_ENTRIES, "readwrite");
+    await promisifyRequest(store.put(stored));
+    return merged;
+  }
+
+  async softDeleteEntry(id: string): Promise<void> {
+    await this.updateEntry(id, {
+      deleted: true,
+      updatedAt: Date.now(),
+      syncState: "local",
+    });
   }
 
   async deleteEntry(id: string): Promise<void> {
@@ -166,8 +209,10 @@ export class IndexedDbStore implements MomentusStore {
 
   async countEntriesForDay(dayKey: string): Promise<number> {
     const store = await this.tx(STORE_ENTRIES, "readonly");
-    const index = store.index("dayKey");
-    return promisifyRequest(index.count(IDBKeyRange.only(dayKey)));
+    const all = (await promisifyRequest(store.getAll())) as StoredEntry[];
+    // Count non-deleted entries for the day (FR6/FR32); the dayKey index can't
+    // express the !deleted predicate, so filter in memory (≤5/day scale).
+    return all.filter((s) => s.dayKey === dayKey && !s.deleted).length;
   }
 
   // --- Vectors ---

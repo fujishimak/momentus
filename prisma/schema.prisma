@@ -25,5 +25,35 @@ model User {
   mustChange   Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  // entries   Entry[]  // added in M2
+  entries      Entry[]
+}
+
+/// A journal entry, account-scoped and synced across the user's devices
+/// (FR27-FR32). Binaries live in Vercel Blob — only the pointer (url/type/size)
+/// is stored here, NEVER the bytes. `updatedAt` is the last-write-wins key and
+/// `deleted` is the tombstone for sync (FR30). `id` is client-generated (UUID)
+/// and honored by the server so ids stay stable across the sync boundary.
+model Entry {
+  id                String   @id
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime
+  updatedAt         DateTime
+  deleted           Boolean  @default(false)
+  modality          String // 'audio' | 'text'
+  textContent       String   @default("")
+  transcriptPending Boolean  @default(false)
+  lat               Float?
+  lng               Float?
+  dayKey            String
+  // Vercel Blob pointers — bytes are NEVER stored in the DB (FR28).
+  audioUrl          String?
+  audioType         String?
+  audioSize         Int?
+  photoUrl          String?
+  photoType         String?
+  photoSize         Int?
+
+  @@index([userId, updatedAt]) // changed-since pulls
+  @@index([userId, dayKey]) // server-side 5/day (FR32)
 }
