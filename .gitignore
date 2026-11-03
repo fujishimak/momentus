@@ -104,3 +104,4 @@ desktop.ini
 
 # --- Local-only agent artifacts (PO reviews are kept in the Obsidian vault) ---
 .kiro/reviews/
+.env*.local
