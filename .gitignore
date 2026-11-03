@@ -101,3 +101,6 @@ desktop.ini
 .cache/
 .turbo/
 *.log
+
+# --- Local-only agent artifacts (PO reviews are kept in the Obsidian vault) ---
+.kiro/reviews/

@@ -32,6 +32,23 @@ export class EmptyEntryError extends Error {
   }
 }
 
+/** Thrown when an audio entry has no recorded audio. */
+export class AudioEntryError extends Error {
+  constructor() {
+    super("There's no audio to save.");
+    this.name = "AudioEntryError";
+  }
+}
+
+/** Shared 5/day guard (FR6): throws if today's cap is already reached. */
+async function assertDailyCapAvailable(
+  store: MomentusStore,
+  dayKey: string,
+): Promise<void> {
+  const countToday = await store.countEntriesForDay(dayKey);
+  if (!canAddEntry(countToday)) throw new DailyLimitError();
+}
+
 export interface SaveTextEntryInput {
   text: string;
   photo?: Blob;
@@ -60,13 +77,50 @@ export async function saveTextEntry(
   const now = input.now ?? Date.now();
   const dayKey = dayKeyOf(now);
 
-  const countToday = await store.countEntriesForDay(dayKey);
-  if (!canAddEntry(countToday)) throw new DailyLimitError();
+  await assertDailyCapAvailable(store, dayKey);
 
   return store.createEntry({
     modality: "text",
     textContent: text,
     transcriptPending: false,
+    photoBlob: input.photo,
+    lat: input.lat,
+    lng: input.lng,
+    createdAt: now,
+    dayKey,
+  });
+}
+
+export interface SaveAudioEntryInput {
+  audio: Blob;
+  photo?: Blob;
+  lat?: number;
+  lng?: number;
+  /** Timestamp override for deterministic testing. Defaults to now. */
+  now?: number;
+}
+
+/**
+ * Validate and persist an audio entry (FR1, FR2, FR5-FR8). The transcript is
+ * left empty with transcriptPending=true for later on-device transcription
+ * (FR4, Phase 10); the 5/day cap is shared with text entries (FR6).
+ */
+export async function saveAudioEntry(
+  store: MomentusStore,
+  input: SaveAudioEntryInput,
+): Promise<Entry> {
+  if (!input.audio || input.audio.size === 0) throw new AudioEntryError();
+
+  const now = input.now ?? Date.now();
+  const dayKey = dayKeyOf(now);
+
+  await assertDailyCapAvailable(store, dayKey);
+
+  return store.createEntry({
+    modality: "audio",
+    textContent: "",
+    transcriptPending: true,
+    audioBlob: input.audio,
     photoBlob: input.photo,
     lat: input.lat,
     lng: input.lng,
