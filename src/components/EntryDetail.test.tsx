@@ -70,7 +70,7 @@ describe("EntryDetail (design §3.6, FR15)", () => {
     expect(screen.getByText(/-0\.1278/)).toBeInTheDocument();
   });
 
-  it("deletes the entry and calls onDeleted", async () => {
+  it("tombstones the entry (soft delete) and calls onDeleted", async () => {
     const store = await freshStore();
     const e = await store.createEntry({
       modality: "text",
@@ -83,7 +83,11 @@ describe("EntryDetail (design §3.6, FR15)", () => {
     await screen.findByText(/to delete/i);
     await user.click(screen.getByRole("button", { name: /delete/i }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
-    expect(await store.getEntry(e.id)).toBeUndefined();
+    // Soft delete: a tombstone remains (so the delete can sync), but the entry
+    // is hidden from the normal list (FR30).
+    const tomb = await store.getEntry(e.id);
+    expect(tomb?.deleted).toBe(true);
+    expect(await store.listEntries()).toHaveLength(0);
   });
 
   it("shows a not-found message for a missing entry", async () => {

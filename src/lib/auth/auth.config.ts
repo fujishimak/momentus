@@ -23,8 +23,16 @@ export const authConfig = {
     authorized({ auth, request }) {
       const isLoggedIn = Boolean(auth?.user);
       const { pathname } = request.nextUrl;
-      if (pathname === "/login" || pathname.startsWith("/api/auth"))
+      // Open: login page, NextAuth endpoints. API routes enforce auth inside
+      // the handler (returning 401 JSON) rather than redirecting to /login,
+      // which would be wrong for a fetch client (FR27/NFR9).
+      if (
+        pathname === "/login" ||
+        pathname.startsWith("/api/auth") ||
+        pathname.startsWith("/api/")
+      ) {
         return true;
+      }
       return isLoggedIn;
     },
     jwt({ token, user }) {
