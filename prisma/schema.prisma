@@ -8,8 +8,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Vercel–Supabase integration provides these (same names on Vercel + local):
+  //   *_PRISMA_URL      = pooled (PgBouncer, port 6543) — runtime
+  //   *_URL_NON_POOLING = direct (port 5432) — migrations (PgBouncer can't migrate)
+  url       = env("MOMENTUS_DB_POSTGRES_PRISMA_URL")
+  directUrl = env("MOMENTUS_DB_POSTGRES_URL_NON_POOLING")
 }
 
 /// The single seeded account (FR23). NextAuth Credentials verifies against
