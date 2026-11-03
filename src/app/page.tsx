@@ -7,6 +7,8 @@ import { getStore } from "@/lib/db";
 import { saveTextEntry, saveAudioEntry } from "@/lib/capture/save-entry";
 import { getCurrentLocation } from "@/lib/capture/location";
 import { getEmbedder } from "@/lib/ai/embeddings";
+import { getSyncController } from "@/lib/sync/controller";
+import { SyncStatus } from "@/components/SyncStatus";
 import { signOut } from "next-auth/react";
 
 type Mode = "audio" | "text";
@@ -23,6 +25,7 @@ export default function CapturePage() {
       lng: loc?.lng,
       embedder: getEmbedder(),
     });
+    void getSyncController().sync(); // push the new entry (fire-and-forget)
     setMode("audio");
   }
 
@@ -34,18 +37,22 @@ export default function CapturePage() {
       lat: loc?.lat,
       lng: loc?.lng,
     });
+    void getSyncController().sync(); // push the new entry (fire-and-forget)
   }
 
   return (
     <section className="capture" aria-labelledby="capture-heading">
-      <button
-        type="button"
-        className="capture__signout"
-        aria-label="Sign out"
-        onClick={() => signOut({ callbackUrl: "/login" })}
-      >
-        Sign out
-      </button>
+      <div className="capture__topbar">
+        <SyncStatus />
+        <button
+          type="button"
+          className="capture__signout"
+          aria-label="Sign out"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+        >
+          Sign out
+        </button>
+      </div>
       <h1 id="capture-heading" className="capture__heading">
         What&rsquo;s On Your Mind?
       </h1>

@@ -13,15 +13,26 @@ stored locally and are searchable/summarisable via on-device AI.
 
 Planning docs live in the Obsidian vault under `Momentus/` (requirements,
 design, tasks). Treat `requirements.md` as the source of truth for scope.
+**Amendment 2 (requirements §10) is current:** the app is now a **hosted
+Next.js server app** with real server-side auth + cross-device sync — it is
+NOT a static export anymore.
 
-- **Frontend:** Next.js (App Router, TypeScript) as a PWA, **static export**
-  (`output: 'export'`) so the same build can be wrapped by Capacitor.
-- **Runtime wrapper (later):** Capacitor, iOS only, **min target iOS 26.7.1**.
-- **Local storage:** data-access layer over IndexedDB (browser) / Capacitor
-  SQLite (native).
+- **Frontend:** Next.js (App Router, TypeScript) PWA, deployed as a **hosted
+  server app** on Vercel (serverless functions + API routes + middleware).
+  (Previously static export; dropped in Amendment 2 to support NextAuth + sync.)
+- **Runtime wrapper (later):** Capacitor, iOS only, **min target iOS 26.7.1**,
+  via the hosted-app model.
+- **Auth:** **NextAuth (Auth.js v5)**, Credentials + JWT, bcrypt, Prisma +
+  Vercel Postgres (Supabase). Single seeded user, forced first-login change,
+  no signup. Split config (`auth.config.ts` edge / `auth.ts` node) keeps the
+  Edge middleware under 1 MB.
+- **Storage & sync:** local-first IndexedDB cache (`lib/db`) **+ cross-device
+  sync** (`lib/sync`) to Vercel Postgres (entry metadata) and **Vercel Blob**
+  (binaries — pointers in the DB, NEVER bytes). Last-write-wins + tombstones.
 - **On-device AI:** embeddings for search (`transformers.js`, wasm); Apple
   Foundation Models for summarisation (native plugin); extractive fallback.
-- **No backend data / no auth / no cloud sync for the MVP.** Local-first.
+- **Offline:** once signed in (valid session), the app works offline; only the
+  first login / re-auth needs connectivity.
 
 ## 2. Package management
 
@@ -31,6 +42,9 @@ design, tasks). Treat `requirements.md` as the source of truth for scope.
 - Commit `pnpm-lock.yaml`. Never commit `node_modules/`.
 - Add dependencies with pinned/exact versions; avoid wide ranges. Vet new
   packages (popularity, maintenance, typosquatting) before adding.
+- Prisma: schema in `prisma/schema.prisma`; `build` runs `prisma generate`.
+  Migrations via `pnpm db:migrate:dev` (local) / `pnpm db:migrate` (deploy).
+  Secrets (`AUTH_SECRET`, DB URLs, `BLOB_READ_WRITE_TOKEN`) are env vars only.
 
 ## 3. Development workflow — TDD
 
@@ -53,7 +67,7 @@ design, tasks). Treat `requirements.md` as the source of truth for scope.
 | -------------------- | ------------------------------------------------------------ |
 | `pnpm dev`           | Next.js dev server                                           |
 | `pnpm dev:https`     | `next dev --experimental-https` (PWA/service-worker testing) |
-| `pnpm build`         | Production static export (`out/`)                            |
+| `pnpm build`         | Production build (`next build`, runs `prisma generate`)      |
 | `pnpm start`         | Serve a production build (where applicable)                  |
 | `pnpm typecheck`     | `tsc --noEmit`                                               |
 | `pnpm lint`          | ESLint                                                       |
@@ -95,17 +109,19 @@ design, tasks). Treat `requirements.md` as the source of truth for scope.
 
 - Follow Next.js PWA guidance: `app/manifest.ts`, HTTPS, offline via **Serwist**
   service worker. Security headers (`X-Content-Type-Options`, `X-Frame-Options`,
-  `Referrer-Policy`, SW `Cache-Control`/CSP) are set at the host/proxy (Vercel)
-  because static export cannot emit headers from `next.config`.
-- **Static-export discipline (so Capacitor works later):**
-  - `output: 'export'`; `images.unoptimized: true`.
-  - No Server Actions, no route handlers depended on at runtime, no server-only
-    data fetching for app behaviour. The app must run from static files in a
-    `file://`/webview context.
-  - Use relative asset paths; avoid hard-coded origins.
-  - Keep all device access behind an abstraction (`lib/capture`, `lib/db`,
-    `lib/ai`) so the browser and Capacitor implementations can diverge without
-    touching UI code.
+  `Referrer-Policy`, SW `Cache-Control`/CSP) are set in **`next.config.ts`**
+  (the app is a hosted server app, so it emits its own headers).
+- **Server-app conventions (Amendment 2):**
+  - Hosted Next.js (`next build`, Vercel serverless); API route handlers under
+    `app/api/*`; auth gating via `middleware.ts` + the split NextAuth config.
+  - API routes enforce auth in-handler via `await auth()` and return **401 JSON**
+    (middleware lets `/api/*` through rather than redirecting).
+  - Keep device access + storage behind abstractions (`lib/capture`, `lib/db`,
+    `lib/sync`, `lib/ai`) so the browser and future Capacitor paths can diverge
+    without touching UI code.
+  - **Binaries (audio/photo) go to Vercel Blob; the DB stores pointers only —
+    never bytes.** Sync is local-first (IndexedDB queue) → push/pull with
+    last-write-wins + tombstones.
 - Request device permissions (mic, camera, location) on first use, never at
   launch; always degrade gracefully.
 
