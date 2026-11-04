@@ -178,11 +178,30 @@ export class IndexedDbStore implements MomentusStore {
   ): Promise<Entry | undefined> {
     const current = await this.getEntry(id);
     if (!current) return undefined;
+    const currentUpdatedAt = current.updatedAt ?? current.createdAt;
+    // Monotonic LWW key: a mutation must advance updatedAt strictly past the
+    // current value. Otherwise a same-millisecond create→update/delete (common
+    // on fast devices) produces an equal timestamp that the server's strict-'>'
+    // LWW check rejects, so the change silently never syncs. Sync-internal
+    // writes that intend to KEEP the key (e.g. marking synced) pass the current
+    // updatedAt explicitly and are preserved; only a would-be regression or tie
+    // on a real content change is bumped.
+    const requested = patch.updatedAt;
+    let nextUpdatedAt: number;
+    if (requested === undefined) {
+      nextUpdatedAt = Math.max(Date.now(), currentUpdatedAt + 1);
+    } else if (requested === currentUpdatedAt) {
+      // Explicitly re-asserting the same key (idempotent sync write): keep it.
+      nextUpdatedAt = requested;
+    } else {
+      // Never let the key move backwards.
+      nextUpdatedAt = Math.max(requested, currentUpdatedAt);
+    }
     const merged: Entry = {
       ...current,
       ...patch,
       id: current.id,
-      updatedAt: patch.updatedAt ?? Date.now(),
+      updatedAt: nextUpdatedAt,
     };
     const stored: StoredEntry = {
       ...merged,
@@ -195,9 +214,11 @@ export class IndexedDbStore implements MomentusStore {
   }
 
   async softDeleteEntry(id: string): Promise<void> {
+    // Omit updatedAt so updateEntry's monotonic rule bumps it strictly past the
+    // current value — a tombstone created in the same ms as the entry still
+    // wins LWW (strict '>') on the server.
     await this.updateEntry(id, {
       deleted: true,
-      updatedAt: Date.now(),
       syncState: "local",
     });
   }

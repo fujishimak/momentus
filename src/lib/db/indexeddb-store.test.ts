@@ -5,7 +5,7 @@
 // spec-compliant Blob/Response/structuredClone, whereas jsdom's Blob cannot be
 // read back (no .arrayBuffer()/.text(), Response(blob) fails). fake-indexeddb
 // works identically under Node.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import { IndexedDbStore } from "./indexeddb-store";
 import type { MomentusStore } from "./types";
@@ -261,6 +261,49 @@ describe("IndexedDbStore — sync fields (M2, FR27-FR31)", () => {
     const forSync = await store.listEntriesForSync();
     const tomb = forSync.find((x) => x.id === e.id);
     expect(tomb?.deleted).toBe(true);
+  });
+
+  it("softDeleteEntry advances updatedAt past createdAt even in the same ms (LWW monotonicity)", async () => {
+    // Regression: on a fast device create + delete can land in the same
+    // millisecond, so a tombstone whose updatedAt equals the created
+    // updatedAt is rejected by the server's strict-'>' LWW check and the
+    // delete silently never propagates. The store must guarantee a strictly
+    // increasing updatedAt on mutation. (Single-writer path — NOT the
+    // accepted two-device same-ms edge from NFR14.)
+    const fixed = 1_700_000_000_000;
+    const spy = vi.spyOn(Date, "now").mockReturnValue(fixed);
+    try {
+      const e = await store.createEntry({
+        modality: "text",
+        textContent: "created and deleted same ms",
+        transcriptPending: false,
+      });
+      expect(e.updatedAt).toBe(fixed);
+
+      await store.softDeleteEntry(e.id);
+      const tomb = await store.getEntry(e.id);
+      expect(tomb?.deleted).toBe(true);
+      // Strictly greater, so the tombstone wins LWW over the created row.
+      expect(tomb!.updatedAt!).toBeGreaterThan(e.updatedAt!);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("updateEntry never regresses updatedAt below the current value (monotonic)", async () => {
+    const e = await store.createEntry({
+      modality: "text",
+      textContent: "x",
+      transcriptPending: false,
+      createdAt: 9_000,
+      updatedAt: 9_000,
+    });
+    // An explicit older updatedAt must not move the LWW key backwards.
+    const updated = await store.updateEntry(e.id, {
+      textContent: "y",
+      updatedAt: 5_000,
+    });
+    expect(updated!.updatedAt!).toBeGreaterThanOrEqual(9_000);
   });
 
   it("excludes tombstones from the daily count (FR6/FR32)", async () => {
