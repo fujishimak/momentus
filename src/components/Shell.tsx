@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { BottomNav } from "./BottomNav";
+import { OfflineIndicator } from "./OfflineIndicator";
 
 /**
  * App shell. Hides the bottom nav on the full-screen /login route; otherwise
@@ -17,6 +18,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="app-shell">
+      <OfflineIndicator />
       <main className="app-main">{children}</main>
       <BottomNav />
     </div>

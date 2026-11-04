@@ -14,8 +14,13 @@ const LABELS: Record<Status, string> = {
 };
 
 /**
- * Small sync-status indicator (FR31) that also drives sync triggers: runs a
+ * Small INLINE sync-status indicator that also drives sync triggers: runs a
  * sync on mount, when the tab regains focus, and when connectivity returns.
+ *
+ * It surfaces synced / syncing / sync-error (and upload-pending in future).
+ * The `offline` state is intentionally NOT rendered here — the global
+ * top-left `OfflineIndicator` (FR33 / design §12.9) owns the disconnected
+ * signal, so showing it inline too would double-signal.
  */
 export function SyncStatus() {
   const [status, setStatus] = useState<Status>("idle");
@@ -35,6 +40,9 @@ export function SyncStatus() {
       window.removeEventListener("focus", run);
     };
   }, []);
+
+  // Offline is surfaced by the global OfflineIndicator; stay quiet inline.
+  if (status === "offline") return null;
 
   return (
     <span
