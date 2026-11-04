@@ -96,10 +96,22 @@ export class SyncEngine {
       }
 
       const wire = toWire({ ...entry, audioUrl, photoUrl });
+      const pushedUpdatedAt = wire.updatedAt;
       await this.server.push([wire]);
+
+      // Compare-and-set: the server.push() above is a network await, during
+      // which a concurrent writer (a local edit, or a pull merge) may have
+      // advanced this entry. Re-read before the trailing write and only mark it
+      // synced if its LWW key is unchanged; otherwise leave it for the next
+      // push so the newer version is not clobbered (lost-update race).
+      const current = await this.store.getEntry(entry.id);
+      if (!current) continue; // deleted under us — nothing to mark.
+      const currentUpdatedAt = current.updatedAt ?? current.createdAt;
+      if (currentUpdatedAt !== pushedUpdatedAt) continue; // changed mid-push.
+
       await this.store.updateEntry(entry.id, {
         syncState: "synced",
-        updatedAt: entry.updatedAt ?? entry.createdAt,
+        updatedAt: pushedUpdatedAt, // keep LWW key stable
       });
     }
   }

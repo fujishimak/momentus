@@ -15,6 +15,8 @@ function freshStore(): MomentusStore {
 class FakeServer implements SyncServer {
   rows = new Map<string, SyncEntry>();
   blobs: { kind: string; bytes: number }[] = [];
+  /** Test hook: runs inside push(), simulating work landing mid-network-call. */
+  onPush?: () => Promise<void>;
 
   async uploadBlob(kind: "audio" | "photo", blob: Blob): Promise<BlobPointer> {
     this.blobs.push({ kind, bytes: blob.size });
@@ -26,6 +28,7 @@ class FakeServer implements SyncServer {
   }
 
   async push(entries: SyncEntry[]): Promise<void> {
+    if (this.onPush) await this.onPush();
     for (const e of entries) {
       const existing = this.rows.get(e.id);
       if (!existing || e.updatedAt > existing.updatedAt) this.rows.set(e.id, e);
@@ -104,6 +107,69 @@ describe("SyncEngine.push (FR29/FR31)", () => {
     await store.softDeleteEntry(e.id);
     await engine.push();
     expect(server.rows.get(e.id)?.deleted).toBe(true);
+  });
+});
+
+describe("SyncEngine.push mid-push lost-update race (hardening)", () => {
+  let store: MomentusStore;
+  let server: FakeServer;
+  let engine: SyncEngine;
+  beforeEach(() => {
+    store = freshStore();
+    server = new FakeServer();
+    engine = new SyncEngine(store, server);
+  });
+
+  it("does not clobber a concurrent local edit made during the push network await", async () => {
+    // An entry is queued for push.
+    const e = await store.createEntry({
+      id: "racey",
+      modality: "text",
+      textContent: "original",
+      transcriptPending: false,
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+
+    // Simulate a concurrent writer (an edit, or a pull merge) landing WHILE the
+    // server.push() network call is in flight: the entry's content + LWW key
+    // (updatedAt) move forward and it goes back to a non-synced state.
+    let fired = false;
+    server.onPush = async () => {
+      if (fired) return;
+      fired = true;
+      await store.updateEntry(e.id, {
+        textContent: "edited mid-push",
+        updatedAt: 5000,
+        syncState: "local",
+      });
+    };
+
+    await engine.push();
+
+    const back = await store.getEntry(e.id);
+    // The newer edit must survive: its content and LWW key must not be
+    // overwritten by the stale snapshot captured before the push started.
+    expect(back?.textContent).toBe("edited mid-push");
+    expect(back?.updatedAt).toBe(5000);
+    // And because it changed under us, it must NOT be marked synced — the next
+    // push has to pick up the newer version.
+    expect(back?.syncState).not.toBe("synced");
+  });
+
+  it("marks the entry synced when nothing changed during the push", async () => {
+    await store.createEntry({
+      id: "calm",
+      modality: "text",
+      textContent: "stable",
+      transcriptPending: false,
+      createdAt: 1000,
+      updatedAt: 1000,
+    });
+    await engine.push();
+    const back = await store.getEntry("calm");
+    expect(back?.syncState).toBe("synced");
+    expect(back?.textContent).toBe("stable");
   });
 });
 
