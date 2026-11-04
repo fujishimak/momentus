@@ -26,8 +26,15 @@ export class HttpSyncServer implements SyncServer {
     if (!res.ok) throw new Error(`push failed: ${res.status}`);
   }
 
-  async pull(since: number): Promise<PullResponse> {
-    const res = await fetch(`/api/entries?since=${since}`);
+  async pull(
+    since: number,
+    sinceId?: string,
+    limit?: number,
+  ): Promise<PullResponse> {
+    const params = new URLSearchParams({ since: String(since) });
+    if (sinceId) params.set("sinceId", sinceId);
+    if (limit) params.set("limit", String(limit));
+    const res = await fetch(`/api/entries?${params.toString()}`);
     if (!res.ok) throw new Error(`pull failed: ${res.status}`);
     return (await res.json()) as PullResponse;
   }

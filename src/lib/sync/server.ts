@@ -1,4 +1,4 @@
-import type { SyncEntry, Modality, BlobPointer } from "./types";
+import type { SyncEntry, Modality, BlobPointer, PullResponse } from "./types";
 
 /** Max entries per local calendar day, enforced server-side (FR32). */
 export const MAX_ENTRIES_PER_DAY = 5;
@@ -91,4 +91,48 @@ export function shouldApplyIncoming(
 /** Whether an entry counts toward the daily cap (non-deleted only, FR32). */
 export function countsTowardDailyCap(r: EntryRow): boolean {
   return !r.deleted;
+}
+
+// --- Pull pagination (NFR13 cold-reconnect) ---
+
+/** Default page size for a pull when the client doesn't specify one. */
+export const DEFAULT_PULL_LIMIT = 200;
+
+/** Hard upper bound on a page so a client can't request an unbounded pull. */
+export const MAX_PULL_LIMIT = 1000;
+
+/** Normalise a requested page size: fall back to the default when absent or
+ * non-positive, and cap at {@link MAX_PULL_LIMIT}. */
+export function clampPullLimit(requested: number | undefined | null): number {
+  if (requested == null || !Number.isFinite(requested) || requested <= 0) {
+    return DEFAULT_PULL_LIMIT;
+  }
+  return Math.min(Math.floor(requested), MAX_PULL_LIMIT);
+}
+
+/**
+ * Build one pull page from rows the caller fetched ordered by
+ * `(updatedAt asc, id asc)`. The caller fetches up to `limit + 1` rows so an
+ * extra row signals that more pages remain.
+ *
+ * The returned `cursor`/`cursorId` is the `(updatedAt, id)` of the LAST entry
+ * in the page — a keyset boundary — so a tied sibling sharing the same
+ * `updatedAt` is never skipped on the next page (correctness under ties).
+ * On an empty page the cursor is left at the requested `since` and `hasMore`
+ * is false.
+ */
+export function buildPullPage(
+  fetched: SyncEntry[],
+  limit: number,
+  since: number,
+): Pick<PullResponse, "entries" | "cursor" | "cursorId" | "hasMore"> {
+  const hasMore = fetched.length > limit;
+  const entries = hasMore ? fetched.slice(0, limit) : fetched;
+  const last = entries[entries.length - 1];
+  return {
+    entries,
+    cursor: last ? last.updatedAt : since,
+    cursorId: last ? last.id : undefined,
+    hasMore,
+  };
 }
