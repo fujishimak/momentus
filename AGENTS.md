@@ -17,6 +17,14 @@ design, tasks). Treat `requirements.md` as the source of truth for scope.
 Next.js server app** with real server-side auth + cross-device sync — it is
 NOT a static export anymore.
 
+> **NEW AGENT / SESSION HANDOFF — START HERE:** read the latest timestamped
+> checkpoint in the Obsidian vault at **`Momentus/checkpoints/`** (newest file).
+> It summarises what was last done, deployment state, open verification, and
+> prioritised next steps, and links the requirements/design/tasks docs. Other
+> vault subfolders: `Momentus/requirements/`, `Momentus/design/`,
+> `Momentus/tasks/`, `Momentus/progress/` (per-PR notes). UI mockups are in this
+> repo at `.kiro/ui_samples/`; PO review notes (git-ignored) in `.kiro/reviews/`.
+
 - **Frontend:** Next.js (App Router, TypeScript) PWA, deployed as a **hosted
   server app** on Vercel (serverless functions + API routes + middleware).
   (Previously static export; dropped in Amendment 2 to support NextAuth + sync.)
