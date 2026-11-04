@@ -5,6 +5,8 @@ import {
   toEntryColumns,
   shouldApplyIncoming,
   MAX_ENTRIES_PER_DAY,
+  clampPullLimit,
+  buildPullPage,
   type EntryRow,
 } from "@/lib/sync/server";
 import type { PullResponse, SyncEntry } from "@/lib/sync/types";
@@ -17,29 +19,48 @@ async function requireUserId(): Promise<string | null> {
 }
 
 /**
- * Pull (FR29): entries for the signed-in user changed since `?since=<epochMs>`
- * (inclusive-exclusive), newest-cursor returned for the next pull. Includes
- * tombstones so deletes propagate (FR30).
+ * Pull (FR29): entries for the signed-in user changed since the cursor,
+ * paginated (NFR13 cold-reconnect). Query:
+ *   ?since=<epochMs>      exclusive lower bound on updatedAt (the cursor)
+ *   &sinceId=<id>         keyset tiebreak: resume after this id at `since`
+ *   &limit=<n>            page size (default/clamped server-side)
+ * Rows are ordered by (updatedAt asc, id asc). The response carries the next
+ * `cursor`/`cursorId` and `hasMore`; the client loops until `hasMore` is false.
+ * Includes tombstones so deletes propagate (FR30).
  */
 export async function GET(req: Request): Promise<Response> {
   const userId = await requireUserId();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const since = Number(new URL(req.url).searchParams.get("since") ?? "0");
+  const params = new URL(req.url).searchParams;
+  const sinceRaw = Number(params.get("since") ?? "0");
+  const since = Number.isFinite(sinceRaw) ? sinceRaw : 0;
+  const sinceId = params.get("sinceId") ?? undefined;
+  const limitRaw = params.get("limit");
+  const limit = clampPullLimit(limitRaw != null ? Number(limitRaw) : undefined);
+
+  const sinceDate = new Date(since);
+  // Keyset predicate: updatedAt > since OR (updatedAt == since AND id > sinceId).
+  // Without a sinceId this is just updatedAt > since (first page / legacy).
+  const where = sinceId
+    ? {
+        userId,
+        OR: [
+          { updatedAt: { gt: sinceDate } },
+          { updatedAt: sinceDate, id: { gt: sinceId } },
+        ],
+      }
+    : { userId, updatedAt: { gt: sinceDate } };
+
+  // Fetch limit+1 to detect whether more pages remain.
   const rows = (await prisma.entry.findMany({
-    where: {
-      userId,
-      updatedAt: { gt: new Date(Number.isFinite(since) ? since : 0) },
-    },
-    orderBy: { updatedAt: "asc" },
+    where,
+    orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+    take: limit + 1,
   })) as EntryRow[];
 
-  const entries = rows.map(toSyncEntry);
-  const cursor = entries.reduce(
-    (max, e) => Math.max(max, e.updatedAt),
-    since || 0,
-  );
-  const body: PullResponse = { entries, cursor };
+  const page = buildPullPage(rows.map(toSyncEntry), limit, since);
+  const body: PullResponse = page as PullResponse;
   return Response.json(body);
 }
 

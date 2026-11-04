@@ -31,8 +31,17 @@ export interface SyncEntry {
 }
 
 /** Pull response: entries changed since the requested cursor, plus the new
- * cursor (max updatedAt seen) for the next pull. */
+ * cursor for the next pull. Pagination (NFR13 cold-reconnect): a page carries
+ * at most `limit` entries; `hasMore` indicates further pages remain, and
+ * `cursorId` is the last entry id at the boundary so a keyset continuation is
+ * exact even when several entries share the same `updatedAt` (ties). */
 export interface PullResponse {
   entries: SyncEntry[];
+  /** Max `updatedAt` at the page boundary (the next `since`). */
   cursor: number;
+  /** Last entry id at the page boundary (the next `sinceId`), for tie-safe
+   * keyset continuation. Absent on an empty page. */
+  cursorId?: string;
+  /** True when more pages remain after this one. */
+  hasMore?: boolean;
 }

@@ -9,7 +9,7 @@ import type { SyncEntry, PullResponse, BlobPointer, Modality } from "./types";
 export interface SyncServer {
   uploadBlob(kind: "audio" | "photo", blob: Blob): Promise<BlobPointer>;
   push(entries: SyncEntry[]): Promise<void>;
-  pull(since: number): Promise<PullResponse>;
+  pull(since: number, sinceId?: string, limit?: number): Promise<PullResponse>;
 }
 
 /** Convert a local Entry (already blob-uploaded) to the wire DTO. */
@@ -55,6 +55,10 @@ function toWire(e: Entry): SyncEntry {
  */
 export class SyncEngine {
   private cursor = 0;
+  /** Keyset tiebreak companion to `cursor` (last id seen at that updatedAt). */
+  private cursorId?: string;
+  /** Page size requested per pull; undefined lets the server pick its default. */
+  private pageLimit?: number;
 
   constructor(
     private readonly store: MomentusStore,
@@ -67,6 +71,11 @@ export class SyncEngine {
 
   setCursor(value: number): void {
     this.cursor = value;
+  }
+
+  /** Set the per-pull page size (NFR13 cold-reconnect). */
+  setPageLimit(limit: number): void {
+    this.pageLimit = limit;
   }
 
   /** Push every entry that isn't fully synced (FR29). Uploads blobs first so
@@ -116,13 +125,27 @@ export class SyncEngine {
     }
   }
 
-  /** Pull remote changes since the cursor and LWW-merge them locally (FR30). */
+  /** Pull remote changes since the cursor and LWW-merge them locally (FR30).
+   * Pages through a large backlog until the server reports no more (NFR13);
+   * the keyset cursor (updatedAt, id) makes continuation tie-safe. */
   async pull(): Promise<void> {
-    const { entries, cursor } = await this.server.pull(this.cursor);
-    for (const remote of entries) {
-      await this.mergeRemote(remote);
+    // Bound the loop defensively so a misbehaving server can't spin forever.
+    for (let guard = 0; guard < 100_000; guard++) {
+      const { entries, cursor, cursorId, hasMore } = await this.server.pull(
+        this.cursor,
+        this.cursorId,
+        this.pageLimit,
+      );
+      for (const remote of entries) {
+        await this.mergeRemote(remote);
+      }
+      // Advance the keyset cursor to this page's boundary.
+      if (cursor > this.cursor || (cursor === this.cursor && cursorId)) {
+        this.cursor = cursor;
+        this.cursorId = cursorId;
+      }
+      if (!hasMore || entries.length === 0) break;
     }
-    if (cursor > this.cursor) this.cursor = cursor;
   }
 
   private async mergeRemote(remote: SyncEntry): Promise<void> {

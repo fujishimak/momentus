@@ -35,10 +35,28 @@ class FakeServer implements SyncServer {
     }
   }
 
-  async pull(since: number): Promise<PullResponse> {
-    const entries = [...this.rows.values()].filter((e) => e.updatedAt > since);
-    const cursor = entries.reduce((m, e) => Math.max(m, e.updatedAt), since);
-    return { entries, cursor };
+  async pull(
+    since: number,
+    sinceId?: string,
+    limit?: number,
+  ): Promise<PullResponse> {
+    const all = [...this.rows.values()]
+      .filter(
+        (e) =>
+          e.updatedAt > since ||
+          (e.updatedAt === since && sinceId !== undefined && e.id > sinceId),
+      )
+      .sort((a, b) => a.updatedAt - b.updatedAt || (a.id < b.id ? -1 : 1));
+    const take = limit ?? all.length;
+    const pageRows = all.slice(0, take);
+    const hasMore = all.length > take;
+    const last = pageRows[pageRows.length - 1];
+    return {
+      entries: pageRows,
+      cursor: last ? last.updatedAt : since,
+      cursorId: last ? last.id : undefined,
+      hasMore,
+    };
   }
 }
 
@@ -286,5 +304,54 @@ describe("SyncEngine.pull (FR29/FR30 LWW)", () => {
     // Nothing newer → cursor unchanged, no error.
     await engine.pull();
     expect(engine.getCursor()).toBe(1000);
+  });
+
+  it("pulls a large backlog across multiple pages (NFR13 cold reconnect)", async () => {
+    // Seed more rows than one page holds.
+    const N = 25;
+    for (let i = 1; i <= N; i++) {
+      server.rows.set(`r${i}`, {
+        id: `r${i}`,
+        createdAt: 1000 + i,
+        updatedAt: 1000 + i,
+        deleted: false,
+        modality: "text",
+        textContent: `entry ${i}`,
+        transcriptPending: false,
+        dayKey: "2026-11-03",
+      });
+    }
+    engine.setPageLimit(10); // force several pages
+    await engine.pull();
+
+    // Every remote entry must be merged locally despite paging.
+    const local = await store.listEntries();
+    expect(local).toHaveLength(N);
+    // Cursor advanced to the newest.
+    expect(engine.getCursor()).toBe(1000 + N);
+    // A follow-up pull fetches nothing new.
+    const before = engine.getCursor();
+    await engine.pull();
+    expect(engine.getCursor()).toBe(before);
+  });
+
+  it("does not skip entries that share an updatedAt across a page boundary (tie-safe)", async () => {
+    // Three entries at the SAME updatedAt, page size 2 → boundary splits them.
+    for (const id of ["a", "b", "c"]) {
+      server.rows.set(id, {
+        id,
+        createdAt: 5000,
+        updatedAt: 5000,
+        deleted: false,
+        modality: "text",
+        textContent: id,
+        transcriptPending: false,
+        dayKey: "2026-11-03",
+      });
+    }
+    engine.setPageLimit(2);
+    await engine.pull();
+    const local = await store.listEntriesForSync();
+    expect(local.map((e) => e.id).sort()).toEqual(["a", "b", "c"]);
   });
 });
