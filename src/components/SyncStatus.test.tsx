@@ -42,10 +42,10 @@ describe("SyncStatus (FR31 indicator)", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/syncing/i);
   });
 
-  it("shows an offline state", () => {
+  it("stays quiet inline when offline (the global OfflineIndicator owns it)", () => {
     render(<SyncStatus />);
     emit("offline");
-    expect(screen.getByRole("status")).toHaveTextContent(/offline/i);
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("triggers a sync on mount", () => {
